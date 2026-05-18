@@ -44,6 +44,7 @@ const sidebarUserEmail = document.getElementById('sidebarUserEmail');
 const topbarUserPhoto = document.getElementById('topbarUserPhoto');
 const userMenuBtn = document.getElementById('userMenuBtn');
 const userDropdown = document.getElementById('userDropdown');
+const deleteAccountBtn = document.getElementById('deleteAccountBtn');
 // logoutBtn is declared in auth.js
 
 // Modal Elements
@@ -395,6 +396,11 @@ function initializeEventListeners() {
     // Logout
     if (logoutBtn) {
         logoutBtn.addEventListener('click', handleLogout);
+    }
+    
+    // Delete Account
+    if (deleteAccountBtn) {
+        deleteAccountBtn.addEventListener('click', handleDeleteAccount);
     }
     
     // Global Search
@@ -784,6 +790,48 @@ async function handleLogout(e) {
             console.error('Logout error:', error);
             showToast('Failed to logout', 'error');
         }
+    }
+}
+
+async function handleDeleteAccount(e) {
+    e.preventDefault();
+    
+    const confirmed = confirm("Are you sure you want to permanently delete your account? This action cannot be undone and will delete all your links and analytics.");
+    if (!confirmed) return;
+
+    try {
+        const token = await getAuthToken();
+        if (!token) {
+            showToast('Authentication required', 'error');
+            return;
+        }
+
+        deleteAccountBtn.disabled = true;
+        deleteAccountBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+        const response = await fetch('/api/user', {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            await firebase.auth().signOut();
+            currentUser = null;
+            userLinks = [];
+            window.location.href = '/';
+        } else {
+            const data = await response.json();
+            showToast(data.error || "Failed to delete account", "error");
+            deleteAccountBtn.disabled = false;
+            deleteAccountBtn.textContent = 'Delete Account';
+        }
+    } catch (error) {
+        console.error("Error deleting account:", error);
+        showToast("An error occurred", "error");
+        deleteAccountBtn.disabled = false;
+        deleteAccountBtn.textContent = 'Delete Account';
     }
 }
 

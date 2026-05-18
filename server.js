@@ -9,6 +9,7 @@ const redisUtils = require('./src/utils/redis.utils');
 require('dotenv').config();
 
 // Initialize Firebase Admin
+let db = null;
 try {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -17,13 +18,12 @@ try {
       privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
     })
   });
+  db = admin.firestore();
   console.log('✅ Firebase Admin initialized');
 } catch (error) {
   console.log('⚠️  Firebase Admin not configured. Using in-memory storage.');
   console.log('   See FIREBASE_SETUP.md for setup instructions.');
 }
-
-const db = admin.firestore();
 
 const app = express();
 const server = http.createServer(app);
@@ -49,7 +49,7 @@ function fromFirestoreId(firestoreId) {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('public', { index: false }));
 
 // Firestore Collections
 const COLLECTIONS = {
@@ -571,6 +571,36 @@ app.get('/api/user/links', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching user links:', error);
     res.status(500).json({ error: 'Failed to fetch links', details: error.message });
+  }
+});
+
+// Delete a user account (requires authentication)
+app.delete('/api/user', verifyToken, async (req, res) => {
+  const userId = req.user.uid;
+  
+  try {
+    if (db) {
+      const linksSnapshot = await db.collection(COLLECTIONS.LINKS)
+                                    .where('userId', '==', userId).get();
+
+      const batch = db.batch();
+      linksSnapshot.docs.forEach(doc => {
+          batch.delete(db.collection(COLLECTIONS.LINKS).doc(doc.id));
+          batch.delete(db.collection(COLLECTIONS.ANALYTICS).doc(doc.id));
+      });
+
+      batch.delete(db.collection(COLLECTIONS.USERS).doc(userId));
+      await batch.commit();
+
+      if (admin.apps.length > 0) {
+        await admin.auth().deleteUser(userId);
+      }
+    }
+    
+    res.json({ success: true, message: 'Account permanently deleted' });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 
