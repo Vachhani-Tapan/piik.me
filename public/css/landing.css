@@ -843,3 +843,57 @@ img {
     max-width: 100%;
     height: auto;
 }
+
+/* Fix: Mobile hamburger drawer button styles */
+#mobileMenu .simple-btn-primary {
+    display: block;
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    background: #ffffff;
+    color: #000000;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    border-radius: 0.75rem;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#mobileMenu .simple-btn-primary:hover {
+    background: #e5e5e5;
+}
+
+#mobileMenu .simple-btn-secondary {
+    display: block;
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    background: transparent;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-align: center;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+#mobileMenu .simple-btn-secondary:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+#mobileMenu {
+    padding: 2rem;
+}
+
+#mobileMenu a {
+    text-decoration: none;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+#mobileMenu a:hover {
+    color: #ffffff;
+}
