@@ -1,0 +1,132 @@
+name: Auto-label new issues
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  label-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue = context.payload.issue;
+            const issueNumber = issue.number;
+            const title = (issue.title || '').toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const text = `${title}\n${body}`;
+
+            const existingIssueLabels = new Set((issue.labels || []).map((label) => label.name));
+            const allRepoLabels = await github.paginate(github.rest.issues.listLabelsForRepo, {
+              owner,
+              repo,
+              per_page: 100
+            });
+            const repoLabelNames = new Set(allRepoLabels.map((label) => label.name));
+
+            const preferredType = [
+              ['bug', ['bug', 'error', 'fix', 'crash', 'broken', 'issue']],
+              ['feature', ['feature', 'enhancement', 'implement', 'add', 'new', 'request']],
+              ['documentation', ['docs', 'documentation', 'readme', 'guide', 'typo', 'spell']],
+              ['ui', ['ui', 'ux', 'design', 'style', 'css', 'layout']],
+              ['performance', ['performance', 'optimize', 'speed', 'slow', 'latency']],
+              ['security', ['security', 'vulnerability', 'auth', 'xss', 'injection']]
+            ];
+            const easySignal = ['typo', 'docs', 'text', 'copy', 'small', 'minor', 'ui'];
+            const hardSignal = ['architecture', 'refactor', 'security', 'database', 'migration', 'performance'];
+
+            const typeLabels = [...repoLabelNames].filter((label) => label.toLowerCase().startsWith('type:'));
+            const levelLabels = [...repoLabelNames].filter((label) => label.toLowerCase().startsWith('level:'));
+
+            const chooseTypeLabel = () => {
+              if (!typeLabels.length) return null;
+
+              let bestLabel = null;
+              let bestScore = 0;
+
+              for (const label of typeLabels) {
+                const normalized = label.toLowerCase();
+                let score = 0;
+
+                for (const [category, keywords] of preferredType) {
+                  if (!normalized.includes(category)) continue;
+                  for (const keyword of keywords) {
+                    if (text.includes(keyword)) score += 1;
+                  }
+                }
+
+                if (score > bestScore) {
+                  bestScore = score;
+                  bestLabel = label;
+                }
+              }
+
+              if (bestLabel) return bestLabel;
+
+              const fallbackByKeyword = [
+                ['bug', ['bug', 'error', 'fix', 'crash']],
+                ['feature', ['feature', 'enhancement', 'request', 'add']],
+                ['documentation', ['docs', 'documentation', 'readme', 'typo']]
+              ];
+
+              for (const [category, keywords] of fallbackByKeyword) {
+                if (keywords.some((keyword) => text.includes(keyword))) {
+                  const match = typeLabels.find((label) => label.toLowerCase().includes(category));
+                  if (match) return match;
+                }
+              }
+
+              return null;
+            };
+
+            const chooseLevelLabel = () => {
+              if (!levelLabels.length) return null;
+
+              const difficulty = hardSignal.some((word) => text.includes(word))
+                ? 'hard'
+                : easySignal.some((word) => text.includes(word))
+                  ? 'easy'
+                  : 'medium';
+
+              const findLevel = (patterns) =>
+                levelLabels.find((label) => patterns.some((pattern) => label.toLowerCase().includes(pattern)));
+
+              if (difficulty === 'easy') {
+                return findLevel(['easy', 'beginner', 'low', 'l1', '1']);
+              }
+              if (difficulty === 'hard') {
+                return findLevel(['hard', 'advanced', 'high', 'expert', 'l3', '3']);
+              }
+              return (
+                findLevel(['medium', 'intermediate', 'moderate', 'l2', '2']) ||
+                findLevel(['easy', 'beginner', 'low', 'l1', '1']) ||
+                findLevel(['hard', 'advanced', 'high', 'expert', 'l3', '3'])
+              );
+            };
+
+            const requestedLabels = ["GSSoC'26", 'mentor:xthxr', chooseTypeLabel(), chooseLevelLabel()].filter(Boolean);
+            const labelsToAdd = requestedLabels.filter(
+              (label) => repoLabelNames.has(label) && !existingIssueLabels.has(label)
+            );
+
+            if (labelsToAdd.length === 0) {
+              core.info('No new labels to add.');
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              labels: labelsToAdd
+            });
+
+            core.info(`Added labels: ${labelsToAdd.join(', ')}`);
