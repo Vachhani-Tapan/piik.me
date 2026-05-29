@@ -4298,13 +4298,119 @@ html[data-theme="dark"] .analytics-card #globeViz {
     }
 }
 
-/* Copy Button */
-.copy-btn {
-    transition: all 0.25s ease;
+/* ================================
+   A/B SPLIT TESTING STYLES
+   ================================ */
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 48px;
+    height: 24px;
 }
 
-.copy-btn.copied {
-    background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
-    transform: scale(1.05);
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: .3s;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--accent-purple);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+}
+
+.weight-badge {
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.weight-badge.status-invalid {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.weight-badge.status-valid {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.weight-distribution-bar {
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.split-test-variants-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-top: 4px;
+    font-size: 12px;
+}
+
+.variant-summary-tag {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Analytics page additions */
+.split-test-analytics-panel {
+    animation: fadeIn 0.4s ease;
+}
+
+.split-analytics-content {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 24px;
+}
+
+.split-chart-wrapper {
+    position: relative;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .split-analytics-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .split-chart-wrapper {
+        height: 200px;
+    }
 }

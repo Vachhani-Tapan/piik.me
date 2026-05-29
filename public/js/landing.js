@@ -122,7 +122,6 @@ function initMobileMenu() {
 // SCROLL ANIMATIONS (Native)
 // ================================
 function initScrollAnimations() {
-    // Navbar Blur Effect
     const navbar = document.getElementById('navbar');
     if (navbar) {
         window.addEventListener('scroll', () => {
@@ -134,8 +133,23 @@ function initScrollAnimations() {
                 navbar.style.backgroundColor = isLight ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.2)';
                 navbar.classList.remove('shadow-lg');
             }
-        });
-    }
+        } else if (currentScrollY > MIN_HIDE_SCROLL) {
+            // Scrolling down - hide navbar
+            if (scrollDifference > SCROLL_THRESHOLD && isNavbarVisible) {
+                navbar.classList.remove('navbar-show');
+                navbar.classList.add('navbar-hide');
+                isNavbarVisible = false;
+            }
+            // Scrolling up - show navbar
+            else if (scrollDifference < -SCROLL_THRESHOLD && !isNavbarVisible) {
+                navbar.classList.remove('navbar-hide');
+                navbar.classList.add('navbar-show');
+                isNavbarVisible = true;
+            }
+        }
+
+        lastScrollY = currentScrollY;
+    });
 }
 
 // ================================
