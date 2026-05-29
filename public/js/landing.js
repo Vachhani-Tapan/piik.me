@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initWorkerGlobe();
     initMobileMenu();
     initScrollAnimations();
+    initThemeToggle();
 });
 
 // ================================
@@ -121,17 +122,80 @@ function initMobileMenu() {
 // SCROLL ANIMATIONS (Native)
 // ================================
 function initScrollAnimations() {
-    // Navbar Blur Effect
     const navbar = document.getElementById('navbar');
     if (navbar) {
         window.addEventListener('scroll', () => {
+            const isLight = document.documentElement.classList.contains('light-theme');
             if (window.scrollY > 50) {
-                navbar.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                navbar.style.backgroundColor = isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.7)';
                 navbar.classList.add('shadow-lg');
             } else {
-                navbar.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                navbar.style.backgroundColor = isLight ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.2)';
                 navbar.classList.remove('shadow-lg');
             }
+        } else if (currentScrollY > MIN_HIDE_SCROLL) {
+            // Scrolling down - hide navbar
+            if (scrollDifference > SCROLL_THRESHOLD && isNavbarVisible) {
+                navbar.classList.remove('navbar-show');
+                navbar.classList.add('navbar-hide');
+                isNavbarVisible = false;
+            }
+            // Scrolling up - show navbar
+            else if (scrollDifference < -SCROLL_THRESHOLD && !isNavbarVisible) {
+                navbar.classList.remove('navbar-hide');
+                navbar.classList.add('navbar-show');
+                isNavbarVisible = true;
+            }
+        }
+
+        lastScrollY = currentScrollY;
+    });
+}
+
+// ================================
+// THEME TOGGLE
+// ================================
+function initThemeToggle() {
+    const desktopToggle = document.getElementById('themeToggleBtn');
+    const mobileToggle = document.getElementById('mobileThemeToggleBtn');
+    const toggles = [desktopToggle, mobileToggle].filter(Boolean);
+    
+    function updateIcon() {
+        const isLight = document.documentElement.classList.contains('light-theme');
+        toggles.forEach(toggle => {
+            const lightIcon = toggle.querySelector('.light-icon');
+            const darkIcon = toggle.querySelector('.dark-icon');
+            if (lightIcon && darkIcon) {
+                if (isLight) {
+                    lightIcon.style.display = 'block';
+                    darkIcon.style.display = 'none';
+                } else {
+                    lightIcon.style.display = 'none';
+                    darkIcon.style.display = 'block';
+                }
+            }
         });
+        
+        // Trigger scroll event to update navbar color based on theme
+        window.dispatchEvent(new Event('scroll'));
     }
+
+    function toggleTheme() {
+        const isLight = document.documentElement.classList.contains('light-theme');
+        if (isLight) {
+            document.documentElement.classList.remove('light-theme');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.add('light-theme');
+            localStorage.setItem('theme', 'light');
+        }
+        updateIcon();
+    }
+
+    toggles.forEach(toggle => {
+        toggle.addEventListener('click', toggleTheme);
+    });
+
+    // Initialize icon state
+    updateIcon();
 }

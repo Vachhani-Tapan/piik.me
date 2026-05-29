@@ -266,6 +266,35 @@
                     </div>
                 </div>
 
+                <!-- Split Test Analytics Panel (Only visible for split-test links) -->
+                <div class="split-test-analytics-panel" id="splitTestAnalyticsPanel" style="display: none; margin-bottom: 24px; padding: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px;">
+                        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary);"><i class="fas fa-flask" style="color: var(--accent-purple);"></i> A/B Split Test Performance</h3>
+                        <span class="badge badge-purple" style="font-size: 11px;">Active Experiment</span>
+                    </div>
+                    <div class="split-analytics-content">
+                        <div class="split-table-wrapper" style="overflow-x: auto;">
+                            <table class="split-test-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); text-align: left; color: var(--text-secondary);">
+                                        <th style="padding: 10px 8px;">Variant</th>
+                                        <th style="padding: 10px 8px;">Destination URL</th>
+                                        <th style="padding: 10px 8px; text-align: center;">Weight</th>
+                                        <th style="padding: 10px 8px; text-align: center;">Clicks</th>
+                                        <th style="padding: 10px 8px; text-align: center;">Share %</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="splitTestAnalyticsTableBody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="split-chart-wrapper">
+                            <canvas id="splitTestChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Charts -->
                 <div class="charts-grid">
                     <div class="chart-card">
@@ -1470,6 +1499,65 @@
                     </svg>
                     Sign in with Google
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Split Test Configurator Modal -->
+    <div class="modal" id="splitTestModal" style="display: none;">
+        <div class="modal-overlay" id="splitTestModalOverlay"></div>
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3>🧪 Configure A/B Split Test</h3>
+                <button class="modal-close" id="splitTestModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <p class="modal-subtitle" style="margin-top: 0; margin-bottom: 20px; color: var(--text-secondary); font-size: 13px;">Route traffic dynamically across multiple destination URLs based on percentage weights.</p>
+                
+                <div class="form-group toggle-group" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <div>
+                        <label style="margin: 0; font-weight: 600; display: block; color: var(--text-primary);">Enable A/B Split Testing</label>
+                        <span style="font-size: 11px; color: var(--text-secondary);">When disabled, visitors will be routed to the main original URL.</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="splitTestEnabledToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <div id="splitTestConfigContainer" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary);">Variants</h4>
+                        <button type="button" class="btn btn-secondary btn-sm" id="addVariantBtn" style="padding: 4px 12px; font-size: 12px;">
+                            <i class="fas fa-plus"></i> Add Variant
+                        </button>
+                    </div>
+                    
+                    <div id="variantsEditorList" class="variants-editor-list" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Rows populated dynamically by app.js -->
+                    </div>
+                    
+                    <div class="distribution-preview-section" style="margin-top: 20px; padding: 16px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 13px; font-weight: 500; color: var(--text-primary);">Weight Distribution Preview</span>
+                            <span id="totalWeightBadge" class="weight-badge status-invalid" style="font-size: 11px; padding: 2px 8px; border-radius: 4px;">0%</span>
+                        </div>
+                        <div class="weight-distribution-bar" id="weightDistributionBar" style="height: 10px; border-radius: 5px; background: rgba(255,255,255,0.05); overflow: hidden; display: flex; margin-bottom: 8px;">
+                            <!-- Visual progress segments -->
+                        </div>
+                        <div id="distributionBarLabels" class="distribution-bar-labels" style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 11px; color: var(--text-secondary);">
+                            <!-- Labels with colors -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px; margin-top: 16px;">
+                <button class="btn btn-secondary" id="splitTestCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="splitTestSaveBtn" disabled>Save Configuration</button>
             </div>
         </div>
     </div>

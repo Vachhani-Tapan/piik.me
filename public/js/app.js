@@ -9,6 +9,7 @@ let userLinks = [];
 // currentUser is declared in auth.js
 let userProfile = null; // Store user profile with username
 let userBioSlug = null; // Store user's username for backward compatibility
+let backendRuntimeStatus = null;
 
 // Debounce utility for real-time updates
 let analyticsUpdateTimeout = null;
@@ -113,12 +114,56 @@ const utmContent = document.getElementById('utmContent');
 // ================================
 
 document.addEventListener('DOMContentLoaded', () => {
+    checkBackendRuntimeStatus();
     initializeTheme();
     initializeAuth();
     initializeNavigation();
     initializeEventListeners();
+    initializeSplitTestEventListeners();
     checkForURLParameter();
 });
+
+async function checkBackendRuntimeStatus() {
+    try {
+        const response = await fetch('/api/system/status');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        backendRuntimeStatus = data;
+
+        if (data?.firebase?.enabled === false) {
+            showFirebaseFallbackNotice(data.firebase);
+        }
+    } catch (error) {
+        console.warn('Runtime status unavailable:', error.message);
+    }
+}
+
+function showFirebaseFallbackNotice(firebaseStatus) {
+    const existingBanner = document.getElementById('firebaseFallbackBanner');
+    if (existingBanner) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'firebaseFallbackBanner';
+    banner.style.cssText = [
+        'position: fixed',
+        'top: 0',
+        'left: 0',
+        'right: 0',
+        'z-index: 9999',
+        'padding: 10px 16px',
+        'font-size: 14px',
+        'font-weight: 600',
+        'text-align: center',
+        'color: #1f1a00',
+        'background: linear-gradient(90deg, #ffe7a3, #ffd56a)',
+        'border-bottom: 1px solid #f0c14b'
+    ].join(';');
+    banner.textContent = `Firebase is disabled (${firebaseStatus.reason}). Auth and persistent database routes are unavailable in this local session.`;
+
+    document.body.prepend(banner);
+    showToast('Firebase fallback mode is active. Some features are disabled.', 'warning');
+}
 
 // ================================
 // THEME SYSTEM
@@ -770,10 +815,16 @@ function showLandingPage() {
     const loginModal = document.getElementById('loginModal');
     const landingPage = document.getElementById('landingPage');
     const appContainer = document.getElementById('app');
-    
-    if (landingPage) landingPage.style.display = 'block';
-    if (loginModal) loginModal.style.display = 'none';
+
+    if (landingPage) {
+        landingPage.style.display = 'block';
+        if (loginModal) loginModal.style.display = 'none';
+        if (appContainer) appContainer.style.display = 'none';
+        return;
+    }
+
     if (appContainer) appContainer.style.display = 'none';
+    if (loginModal) loginModal.style.display = 'flex';
 }
 
 async function handleLogout(e) {
@@ -1208,11 +1259,18 @@ function displayLinks(links, filter) {
                         <i class="fas fa-copy"></i>
                     </button>
                     ${isInactive ? `<span class="inactive-badge">Inactive</span>` : ''}
+                    ${link.splitTest ? `<span class="split-test-badge" style="background: linear-gradient(135deg, var(--accent-purple), #8b5cf6); color: white; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; margin-left: 6px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-flask" style="font-size: 9px;"></i> Split Test</span>` : ''}
                 </div>
-                <div class="link-destination">${link.originalUrl}</div>
+                ${link.splitTest && Array.isArray(link.variants) && link.variants.length > 0 ? `
+                    <div class="link-destination split-test-variants-summary" style="display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 4px; font-size: 12px; color: var(--text-secondary);">
+                        ${link.variants.map(v => `<span class="variant-summary-tag"><strong style="color: var(--accent-purple);">${v.label}</strong> (${v.weight}%): <span style="opacity: 0.8;">${v.url}</span></span>`).join('')}
+                    </div>
+                ` : `
+                    <div class="link-destination">${link.originalUrl}</div>
+                `}
                 <div class="link-meta">
                     <span><i class="fas fa-calendar"></i> ${formatDate(link.createdAt)}</span>
-                    ${link.utmParams ? '<span><i class="fas fa-tags"></i> UTM Enabled</span>' : ''}
+                    ${link.utmParams && !link.splitTest ? '<span><i class="fas fa-tags"></i> UTM Enabled</span>' : ''}
                     ${isInactive && daysRemaining ? `<span style="color: var(--accent-red);"><i class="fas fa-clock"></i> Deletes in ${daysRemaining} days</span>` : ''}
                 </div>
             </div>
@@ -1224,6 +1282,9 @@ function displayLinks(links, filter) {
             </div>
             <div class="link-actions">
                 ${!isInactive ? `
+                    <button class="link-action-btn" onclick="openSplitTestModal('${link.shortCode}')" title="Split Test">
+                        <i class="fas fa-flask"></i>
+                    </button>
                     <button class="link-action-btn" onclick="viewAnalytics('${link.shortCode}')" title="Analytics">
                         <i class="fas fa-chart-line"></i>
                     </button>
@@ -1534,6 +1595,475 @@ function copyLink(url) {
         showToast('Link copied to clipboard!', 'success');
     }).catch(() => {
         showToast('Failed to copy link', 'error');
+    });
+}
+
+let currentSplitTestShortCode = null;
+let splitTestChartInstance = null;
+
+async function openSplitTestModal(shortCode) {
+    currentSplitTestShortCode = shortCode;
+    const modal = document.getElementById('splitTestModal');
+    const enabledToggle = document.getElementById('splitTestEnabledToggle');
+    const configContainer = document.getElementById('splitTestConfigContainer');
+    const variantsList = document.getElementById('variantsEditorList');
+    
+    // Show modal
+    modal.style.display = 'flex';
+    variantsList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);"><i class="fas fa-spinner fa-spin"></i> Loading configuration...</div>';
+    
+    try {
+        let linkData = null;
+        if (typeof firebase !== 'undefined' && firebase.firestore) {
+            const db = firebase.firestore();
+            const docId = toFirestoreId(shortCode);
+            const doc = await db.collection('links').doc(docId).get();
+            if (doc.exists) {
+                linkData = doc.data();
+            }
+        }
+        
+        // If not found in firestore, search in userLinks array
+        if (!linkData && typeof userLinks !== 'undefined') {
+            linkData = userLinks.find(l => l.shortCode === shortCode);
+        }
+        
+        if (!linkData) {
+            showToast('Link not found', 'error');
+            modal.style.display = 'none';
+            return;
+        }
+        
+        const splitTest = linkData.splitTest || false;
+        enabledToggle.checked = splitTest;
+        configContainer.style.display = splitTest ? 'block' : 'none';
+        
+        const variants = linkData.variants || [
+            { label: 'Variant A', url: linkData.originalUrl || '', weight: 50 },
+            { label: 'Variant B', url: '', weight: 50 }
+        ];
+        
+        renderVariantsEditor(variants);
+        updateWeightCalculations();
+        
+    } catch (err) {
+        console.error('Error loading split test:', err);
+        showToast('Error loading configuration', 'error');
+        modal.style.display = 'none';
+    }
+}
+
+function renderVariantsEditor(variants) {
+    const list = document.getElementById('variantsEditorList');
+    list.innerHTML = '';
+    
+    variants.forEach((v, index) => {
+        const row = document.createElement('div');
+        row.className = 'variant-editor-row';
+        row.style = 'display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.01); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);';
+        row.innerHTML = `
+            <div style="flex: 1; min-width: 100px;">
+                <input type="text" class="form-input variant-label" value="${escapeHtml(v.label)}" placeholder="Label (e.g. Variant A)" style="width: 100%; margin: 0; padding: 6px 10px;" required>
+            </div>
+            <div style="flex: 3; min-width: 200px;">
+                <input type="url" class="form-input variant-url" value="${escapeHtml(v.url)}" placeholder="https://destination-url.com" style="width: 100%; margin: 0; padding: 6px 10px;" required>
+            </div>
+            <div style="width: 80px; display: flex; align-items: center; gap: 4px;">
+                <input type="number" class="form-input variant-weight" value="${v.weight}" min="0" max="100" style="width: 100%; margin: 0; padding: 6px; text-align: center;" required>%
+            </div>
+            <button type="button" class="btn-icon delete-variant-btn" style="color: var(--accent-red); margin-left: 4px;" title="Remove variant">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+        
+        // Add events
+        const labelInput = row.querySelector('.variant-label');
+        const urlInput = row.querySelector('.variant-url');
+        const weightInput = row.querySelector('.variant-weight');
+        const deleteBtn = row.querySelector('.delete-variant-btn');
+        
+        labelInput.addEventListener('input', updateWeightCalculations);
+        urlInput.addEventListener('input', updateWeightCalculations);
+        weightInput.addEventListener('input', updateWeightCalculations);
+        
+        deleteBtn.addEventListener('click', () => {
+            const rows = list.querySelectorAll('.variant-editor-row');
+            if (rows.length <= 2) {
+                showToast('A split test requires at least 2 variants.', 'warning');
+                return;
+            }
+            row.remove();
+            updateWeightCalculations();
+        });
+        
+        list.appendChild(row);
+    });
+}
+
+function updateWeightCalculations() {
+    const list = document.getElementById('variantsEditorList');
+    if (!list) return;
+    const rows = list.querySelectorAll('.variant-editor-row');
+    const saveBtn = document.getElementById('splitTestSaveBtn');
+    const totalBadge = document.getElementById('totalWeightBadge');
+    const distBar = document.getElementById('weightDistributionBar');
+    const distLabels = document.getElementById('distributionBarLabels');
+    const enabledToggle = document.getElementById('splitTestEnabledToggle');
+    
+    if (!enabledToggle || !saveBtn || !totalBadge || !distBar || !distLabels) return;
+    
+    if (!enabledToggle.checked) {
+        saveBtn.disabled = false;
+        totalBadge.textContent = 'Disabled';
+        totalBadge.style.background = 'rgba(255,255,255,0.1)';
+        totalBadge.style.color = 'var(--text-secondary)';
+        distBar.innerHTML = '<div style="width: 100%; height: 100%; background: rgba(255,255,255,0.05);"></div>';
+        distLabels.innerHTML = '';
+        return;
+    }
+    
+    let totalWeight = 0;
+    const variants = [];
+    let hasDuplicateLabels = false;
+    let hasInvalidUrls = false;
+    let hasEmptyFields = false;
+    const seenLabels = new Set();
+    
+    // Pick cohesive colors for variants preview
+    const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#a855f7', '#f43f5e', '#14b8a6'];
+    
+    rows.forEach((row, i) => {
+        const label = row.querySelector('.variant-label').value.trim();
+        const url = row.querySelector('.variant-url').value.trim();
+        const weightVal = parseInt(row.querySelector('.variant-weight').value) || 0;
+        
+        totalWeight += weightVal;
+        
+        if (!label || !url) {
+            hasEmptyFields = true;
+        }
+        
+        if (seenLabels.has(label.toLowerCase())) {
+            hasDuplicateLabels = true;
+        }
+        seenLabels.add(label.toLowerCase());
+        
+        try {
+            new URL(url);
+        } catch {
+            hasInvalidUrls = true;
+        }
+        
+        variants.push({ label, url, weight: weightVal, color: colors[i % colors.length] });
+    });
+    
+    // Update badge style
+    totalBadge.textContent = `${totalWeight}%`;
+    if (totalWeight === 100) {
+        totalBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+        totalBadge.style.color = '#10b981';
+        totalBadge.textContent = '100% (Valid)';
+    } else {
+        totalBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+        totalBadge.style.color = '#ef4444';
+        totalBadge.textContent = `${totalWeight}% (Must sum to 100%)`;
+    }
+    
+    // Update live distribution bar
+    distBar.innerHTML = '';
+    distLabels.innerHTML = '';
+    
+    variants.forEach(v => {
+        if (v.weight > 0) {
+            const segment = document.createElement('div');
+            segment.style.width = `${(v.weight / Math.max(totalWeight, 1)) * 100}%`;
+            segment.style.height = '100%';
+            segment.style.backgroundColor = v.color;
+            segment.style.transition = 'width 0.3s ease';
+            segment.title = `${v.label} (${v.weight}%)`;
+            distBar.appendChild(segment);
+            
+            const labelTag = document.createElement('div');
+            labelTag.style = 'display: flex; align-items: center; gap: 4px;';
+            labelTag.innerHTML = `
+                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${v.color};"></span>
+                <span>${escapeHtml(v.label)} (${v.weight}%)</span>
+            `;
+            distLabels.appendChild(labelTag);
+        }
+    });
+    
+    // Enable/disable save button
+    const isValid = totalWeight === 100 && !hasDuplicateLabels && !hasInvalidUrls && !hasEmptyFields && rows.length >= 2;
+    saveBtn.disabled = !isValid;
+    
+    // Helper to highlight errors for debugging
+    if (hasDuplicateLabels) {
+        totalBadge.textContent += ' [Duplicate labels]';
+    } else if (hasInvalidUrls) {
+        totalBadge.textContent += ' [Invalid URLs]';
+    } else if (hasEmptyFields) {
+        totalBadge.textContent += ' [Empty fields]';
+    }
+}
+
+async function saveSplitTest() {
+    if (!currentSplitTestShortCode) return;
+    
+    const enabledToggle = document.getElementById('splitTestEnabledToggle');
+    const list = document.getElementById('variantsEditorList');
+    const saveBtn = document.getElementById('splitTestSaveBtn');
+    
+    if (typeof firebase === 'undefined' || !firebase.auth) {
+        showToast('Auth not available', 'error');
+        return;
+    }
+    
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        showToast('Authentication required', 'error');
+        return;
+    }
+    
+    const originalText = saveBtn.textContent;
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    
+    try {
+        const token = await user.getIdToken();
+        const shortCodeEncoded = encodeURIComponent(currentSplitTestShortCode);
+        
+        let response;
+        if (enabledToggle.checked) {
+            // Collect variants
+            const rows = list.querySelectorAll('.variant-editor-row');
+            const variants = [];
+            rows.forEach(row => {
+                const label = row.querySelector('.variant-label').value.trim();
+                const url = row.querySelector('.variant-url').value.trim();
+                const weight = parseInt(row.querySelector('.variant-weight').value) || 0;
+                variants.push({ label, url, weight });
+            });
+            
+            response = await fetch(`/api/links/${shortCodeEncoded}/split-test`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ variants })
+            });
+        } else {
+            response = await fetch(`/api/links/${shortCodeEncoded}/split-test`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+        }
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showToast(result.message || 'Configuration saved successfully', 'success');
+            document.getElementById('splitTestModal').style.display = 'none';
+            
+            // Reload user dashboard links
+            if (typeof loadLinks === 'function') {
+                await loadLinks();
+            }
+        } else {
+            throw new Error(result.error || 'Failed to save configuration');
+        }
+        
+    } catch (err) {
+        console.error('Error saving split test:', err);
+        showToast('Failed to save configuration: ' + err.message, 'error');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+    }
+}
+
+function initializeSplitTestEventListeners() {
+    const modal = document.getElementById('splitTestModal');
+    const modalOverlay = document.getElementById('splitTestModalOverlay');
+    const modalClose = document.getElementById('splitTestModalClose');
+    const cancelBtn = document.getElementById('splitTestCancelBtn');
+    const saveBtn = document.getElementById('splitTestSaveBtn');
+    const enabledToggle = document.getElementById('splitTestEnabledToggle');
+    const configContainer = document.getElementById('splitTestConfigContainer');
+    const addVariantBtn = document.getElementById('addVariantBtn');
+    
+    // Close handlers
+    const closeModal = () => {
+        modal.style.display = 'none';
+        currentSplitTestShortCode = null;
+    };
+    
+    if (modalOverlay) modalOverlay.addEventListener('click', closeModal);
+    if (modalClose) modalClose.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    
+    // Save handler
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveSplitTest);
+    }
+    
+    // Enable/disable toggle
+    if (enabledToggle && configContainer) {
+        enabledToggle.addEventListener('change', () => {
+            configContainer.style.display = enabledToggle.checked ? 'block' : 'none';
+            updateWeightCalculations();
+        });
+    }
+    
+    // Add variant row
+    if (addVariantBtn) {
+        addVariantBtn.addEventListener('click', () => {
+            const list = document.getElementById('variantsEditorList');
+            const rows = list.querySelectorAll('.variant-editor-row');
+            if (rows.length >= 10) {
+                showToast('A split test supports at most 10 variants.', 'warning');
+                return;
+            }
+            
+            // Generate next alphabet label
+            const labelChar = String.fromCharCode(65 + rows.length); // A, B, C, D...
+            const nextLabel = `Variant ${labelChar}`;
+            
+            const row = document.createElement('div');
+            row.className = 'variant-editor-row';
+            row.style = 'display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.01); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);';
+            row.innerHTML = `
+                <div style="flex: 1; min-width: 100px;">
+                    <input type="text" class="form-input variant-label" value="${nextLabel}" placeholder="Label (e.g. Variant A)" style="width: 100%; margin: 0; padding: 6px 10px;" required>
+                </div>
+                <div style="flex: 3; min-width: 200px;">
+                    <input type="url" class="form-input variant-url" value="" placeholder="https://destination-url.com" style="width: 100%; margin: 0; padding: 6px 10px;" required>
+                </div>
+                <div style="width: 80px; display: flex; align-items: center; gap: 4px;">
+                    <input type="number" class="form-input variant-weight" value="0" min="0" max="100" style="width: 100%; margin: 0; padding: 6px; text-align: center;" required>%
+                </div>
+                <button type="button" class="btn-icon delete-variant-btn" style="color: var(--accent-red); margin-left: 4px;" title="Remove variant">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+            
+            // Add events
+            const labelInput = row.querySelector('.variant-label');
+            const urlInput = row.querySelector('.variant-url');
+            const weightInput = row.querySelector('.variant-weight');
+            const deleteBtn = row.querySelector('.delete-variant-btn');
+            
+            labelInput.addEventListener('input', updateWeightCalculations);
+            urlInput.addEventListener('input', updateWeightCalculations);
+            weightInput.addEventListener('input', updateWeightCalculations);
+            
+            deleteBtn.addEventListener('click', () => {
+                const currentRows = list.querySelectorAll('.variant-editor-row');
+                if (currentRows.length <= 2) {
+                    showToast('A split test requires at least 2 variants.', 'warning');
+                    return;
+                }
+                row.remove();
+                updateWeightCalculations();
+            });
+            
+            list.appendChild(row);
+            updateWeightCalculations();
+        });
+    }
+}
+
+function renderSplitTestAnalytics(isSplitTest, variants, clicks) {
+    const panel = document.getElementById('splitTestAnalyticsPanel');
+    const tableBody = document.getElementById('splitTestAnalyticsTableBody');
+    
+    if (!panel) return;
+    
+    if (!isSplitTest || !variants || variants.length === 0) {
+        panel.style.display = 'none';
+        return;
+    }
+    
+    panel.style.display = 'block';
+    tableBody.innerHTML = '';
+    
+    // Sort variants by weight/label
+    const totalClicks = Object.values(clicks).reduce((sum, c) => sum + c, 0);
+    const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#a855f7', '#f43f5e', '#14b8a6'];
+    
+    variants.forEach((v, index) => {
+        const variantClicks = clicks[v.label] || 0;
+        const clickShare = totalClicks > 0 ? ((variantClicks / totalClicks) * 100).toFixed(1) : '0.0';
+        const color = colors[index % colors.length];
+        
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        row.innerHTML = `
+            <td style="padding: 12px 8px; display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color};"></span>
+                ${escapeHtml(v.label)}
+            </td>
+            <td style="padding: 12px 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary);" title="${escapeHtml(v.url)}">
+                ${escapeHtml(v.url)}
+            </td>
+            <td style="padding: 12px 8px; text-align: center; font-weight: 500;">${v.weight}%</td>
+            <td style="padding: 12px 8px; text-align: center; font-weight: 600; color: var(--text-primary);">${variantClicks.toLocaleString()}</td>
+            <td style="padding: 12px 8px; text-align: center; color: var(--text-secondary);">${clickShare}%</td>
+        `;
+        tableBody.appendChild(row);
+    });
+    
+    // Render Chart.js pie/doughnut or bar chart for variants
+    const ctx = document.getElementById('splitTestChart');
+    if (!ctx) return;
+    
+    if (splitTestChartInstance) {
+        splitTestChartInstance.destroy();
+    }
+    
+    const chartLabels = variants.map(v => v.label);
+    const chartData = variants.map(v => clicks[v.label] || 0);
+    const chartColors = variants.map((_, i) => colors[i % colors.length]);
+    
+    // If all clicks are zero, default to a gray or equal share representation
+    const isAllZero = chartData.every(val => val === 0);
+    const displayData = isAllZero ? variants.map(() => 1) : chartData;
+    
+    splitTestChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                data: displayData,
+                backgroundColor: chartColors,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.05)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        color: 'var(--text-secondary)',
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const val = chartData[context.dataIndex];
+                            return `${context.label}: ${val.toLocaleString()} clicks`;
+                        }
+                    }
+                }
+            }
+        }
     });
 }
 
@@ -1939,6 +2469,9 @@ async function loadAnalyticsData(linkFilter) {
         let referrers = {};
         let clicksOverTime = {};
         let allClickHistory = [];
+        let isSplitTest = false;
+        let splitTestVariants = [];
+        let variantClicks = {};
         
         // Fetch links based on filter
         let linksQuery;
@@ -1969,6 +2502,19 @@ async function loadAnalyticsData(linkFilter) {
             
             if (analyticsDoc.exists) {
                 const analytics = analyticsDoc.data();
+                
+                // Read split test if filtering by a single link
+                if (linkFilter !== 'all' && linkData.splitTest) {
+                    isSplitTest = true;
+                    splitTestVariants = linkData.variants || [];
+                }
+                
+                // Aggregate variant clicks
+                if (analytics.variantClicks) {
+                    Object.entries(analytics.variantClicks).forEach(([variant, count]) => {
+                        variantClicks[variant] = (variantClicks[variant] || 0) + count;
+                    });
+                }
                 
                 console.log(`Analytics for ${shortCode}:`, analytics);
                 
@@ -2111,6 +2657,7 @@ async function loadAnalyticsData(linkFilter) {
         renderDevicesList(devicesList);
         renderBrowsersList(browsersList);
         renderReferrersList(topReferrers);
+        renderSplitTestAnalytics(isSplitTest, splitTestVariants, variantClicks);
         
         console.log('✅ Analytics loaded successfully:', {
             totalImpressions,
