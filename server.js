@@ -424,8 +424,8 @@ app.post('/api/shorten', verifyToken, async (req, res) => {
   }
 });
 
-// Get analytics for a short link
-app.get('/api/analytics/:shortCode', async (req, res) => {
+// Get analytics for a short link (requires authentication)
+app.get('/api/analytics/:shortCode', verifyToken, async (req, res) => {
   const { shortCode } = req.params;
   
   try {
