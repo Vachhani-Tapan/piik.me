@@ -5,18 +5,17 @@ const cors = require('cors');
 const path = require('path');
 const { nanoid } = require('nanoid');
 const admin = require('firebase-admin');
-const fetch = require('node-fetch');
+// Use the native fetch when available (Node 18+); fall back to node-fetch for
+// older runtimes. A single declaration replaces the two separate const fetch
+// assignments that previously caused SyntaxError: Identifier 'fetch' has
+// already been declared when Node.js parsed the file.
+const fetch = typeof globalThis.fetch === 'function'
+  ? globalThis.fetch
+  : (...args) => import('node-fetch').then(({ default: fetchFn }) => fetchFn(...args));
 const redisUtils = require('./src/utils/redis.utils');
 const redirectCache = require('./src/utils/redirect-cache.utils');
 const { securityHeaders, apiLimiter } = require('./src/middleware/security.middleware');
 require('dotenv').config();
-const fetch = (...args) => {
-  if (typeof globalThis.fetch === 'function') {
-    return globalThis.fetch(...args);
-  }
-
-  return import('node-fetch').then(({ default: fetchFn }) => fetchFn(...args));
-};
 
 // Initialize Firebase Admin
 let db = null;
