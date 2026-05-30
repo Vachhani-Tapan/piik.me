@@ -268,9 +268,15 @@ app.post('/api/shorten', verifyToken, async (req, res) => {
     return res.status(400).json({ error: 'URL is required' });
   }
 
-  // Validate URL
+  // Validate URL structure and block dangerous schemes.
+  // new URL() only checks syntactic correctness; it accepts javascript:, data:,
+  // vbscript:, and other schemes that are unsafe as redirect destinations.
+  // Enforce an explicit allowlist so only http and https links can be shortened.
   try {
-    new URL(url);
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return res.status(400).json({ error: 'Only http and https URLs are allowed' });
+    }
   } catch (e) {
     return res.status(400).json({ error: 'Invalid URL' });
   }
