@@ -1117,17 +1117,28 @@ async function handleCreateLink() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                url,
-                customShortCode: customCode || null,
-                username: userBioSlug || null,
-                utmParams: Object.keys(utmParams).length > 0 ? utmParams : null,
-                expiresAt: document.getElementById('expiresAt')?.value || null,
-                maxClicks: document.getElementById('maxClicks')?.value
-                    ? parseInt(document.getElementById('maxClicks').value)
-                    : null
-            })
-        });
+          body: JSON.stringify({
+    url,
+    customShortCode: customCode || null,
+    username: userBioSlug || null,
+    utmParams: Object.keys(utmParams).length > 0 ? utmParams : null,
+
+    notes: document.getElementById('linkNotes')?.value || '',
+
+    tags: document.getElementById('linkTags')?.value
+        ? document.getElementById('linkTags').value
+            .split(',')
+            .map(tag => tag.trim())
+            .filter(tag => tag.length > 0)
+        : [],
+
+    expiresAt: document.getElementById('expiresAt')?.value || null,
+
+    maxClicks: document.getElementById('maxClicks')?.value
+        ? parseInt(document.getElementById('maxClicks').value)
+        : null
+})
+});
         
         if (!response.ok) {
             let errorMsg = 'Failed to create link';
@@ -1289,7 +1300,39 @@ function displayLinks(links, filter) {
                         ${link.variants.map(v => `<span class="variant-summary-tag"><strong style="color: var(--accent-purple);">${v.label}</strong> (${v.weight}%): <span style="opacity: 0.8;">${v.url}</span></span>`).join('')}
                     </div>
                 ` : `
-                    <div class="link-destination">${link.originalUrl}</div>
+                   <div class="link-destination">${link.originalUrl}</div>
+
+${link.notes ? `
+<div class="link-notes" style="
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+">
+    <i class="fas fa-sticky-note"></i>
+    ${link.notes}
+</div>
+` : ''}
+
+${link.tags && link.tags.length ? `
+    <div class="link-tags" style="
+        margin-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    ">
+        ${link.tags.map(tag => `
+            <span style="
+                background: var(--accent-color);
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+            ">
+                ${tag}
+            </span>
+        `).join('')}
+    </div>
+` : ''}
                 `}
                 <div class="link-meta">
                     <span><i class="fas fa-calendar"></i> ${formatDate(link.createdAt)}</span>

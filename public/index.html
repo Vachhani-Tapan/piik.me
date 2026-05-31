@@ -1179,23 +1179,59 @@
                         </div>
                     </div>
                 </div>
+ <<div class="form-section">
+    <h4>Link Organization</h4>
 
-                <div class="form-section">
-                    <h4>Link Expiry (Optional)</h4>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Expire After Date</label>
-                            <input type="datetime-local" class="form-input" id="expiresAt">
-                            <small style="color: var(--text-tertiary); font-size: 12px;">Link auto-deactivates after this date</small>
-                        </div>
-                        <div class="form-group">
-                            <label>Max Clicks</label>
-                            <input type="number" class="form-input" id="maxClicks" min="1" placeholder="e.g. 100">
-                            <small style="color: var(--text-tertiary); font-size: 12px;">Link auto-deactivates after N clicks</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="form-group">
+        <label>Notes</label>
+        <textarea
+            class="form-input"
+            id="linkNotes"
+            rows="3"
+            placeholder="Add private notes about this link..."
+        ></textarea>
+    </div>
+
+    <div class="form-group">
+        <label>Tags</label>
+        <input
+            type="text"
+            class="form-input"
+            id="linkTags"
+            placeholder="marketing, instagram, campaign"
+        >
+        <small style="color: var(--text-tertiary); font-size: 12px;">
+            Separate tags using commas.
+        </small>
+    </div>
+</div>
+
+<div class="form-section">
+    <h4>Link Expiry (Optional)</h4>
+    <div class="form-grid">
+        <div class="form-group">
+            <label>Expire After Date</label>
+            <input type="datetime-local" class="form-input" id="expiresAt">
+            <small style="color: var(--text-tertiary); font-size: 12px;">
+                Link auto-deactivates after this date
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label>Max Clicks</label>
+            <input
+                type="number"
+                class="form-input"
+                id="maxClicks"
+                min="1"
+                placeholder="e.g. 100"
+            >
+            <small style="color: var(--text-tertiary); font-size: 12px;">
+                Link auto-deactivates after N clicks
+            </small>
+        </div>
+    </div>
+</div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="modalCancel">Cancel</button>
                 <button class="btn btn-primary" id="createLinkSubmit">

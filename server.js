@@ -5,7 +5,6 @@ const cors = require('cors');
 const path = require('path');
 const { nanoid } = require('nanoid');
 const admin = require('firebase-admin');
-const fetch = require('node-fetch');
 const redisUtils = require('./src/utils/redis.utils');
 const redirectCache = require('./src/utils/redirect-cache.utils');
 const { securityHeaders, apiLimiter } = require('./src/middleware/security.middleware');
@@ -261,7 +260,14 @@ function getBaseUrl(req) {
 
 // Create short link (requires authentication)
 app.post('/api/shorten', verifyToken, async (req, res) => {
-  const { url, utmParams, customShortCode, username } = req.body;
+  const {
+  url,
+  utmParams,
+  customShortCode,
+  username,
+  notes,
+  tags
+} = req.body;
   const userId = req.user.uid;
   
   if (!url) {
@@ -342,22 +348,25 @@ app.post('/api/shorten', verifyToken, async (req, res) => {
   const { expiresAt, maxClicks } = req.body;
 
   const linkData = {
-    originalUrl: finalUrl,
-    shortCode,
-    shortUrl,
-    userId,
-    userEmail: req.user.email || '',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    utmParams: parseUTMParams(finalUrl) || utmParams || {},
-    isCustom: !!customShortCode,
-    isActive: true,
-    expiresAt: expiresAt ? admin.firestore.Timestamp.fromDate(new Date(expiresAt)) : null,
-    maxClicks: maxClicks ? parseInt(maxClicks) : null,
-    clickCount: 0,
-    notifiedExpiry: false,
-    isExpired: false
-  };
+  originalUrl: finalUrl,
+  shortCode,
+  shortUrl,
+  userId,
+  userEmail: req.user.email || '',
 
+  notes: notes || '',
+  tags: Array.isArray(tags) ? tags : [],
+
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  utmParams: parseUTMParams(finalUrl) || utmParams || {},
+  isCustom: !!customShortCode,
+  isActive: true,
+  expiresAt: expiresAt ? admin.firestore.Timestamp.fromDate(new Date(expiresAt)) : null,
+  maxClicks: maxClicks ? parseInt(maxClicks) : null,
+  clickCount: 0,
+  notifiedExpiry: false,
+  isExpired: false
+};
   const analyticsData = {
     impressions: 0,
     clicks: 0,
