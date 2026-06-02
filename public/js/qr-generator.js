@@ -205,15 +205,6 @@ const QRGenerator = {
         window.addEventListener('scroll', handleScroll);
     },
 
-    updateFloatingPreview() {
-        // Copy main canvas to floating canvas
-        if (this.qrCanvas && this.floatingCanvas) {
-            const ctx = this.floatingCanvas.getContext('2d');
-            ctx.clearRect(0, 0, 400, 400);
-            ctx.drawImage(this.qrCanvas, 0, 0, 400, 400);
-        }
-    },
-
     cacheDom() {
         this.qrLinkInput = document.getElementById('qrLinkInput');
         this.generateBtn = document.getElementById('generateQRBtn');

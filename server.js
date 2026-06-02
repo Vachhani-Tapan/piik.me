@@ -1513,7 +1513,7 @@ function getReferrerSource(req) {
   const httpReferrer = req.headers['referer'] || req.headers['referrer'] || '';
   const utmSource = req.query.utm_source;
   
-  let referrerSource = 'Direct';
+  let referrerSource;
   
   if (utmSource) {
     referrerSource = utmSource.charAt(0).toUpperCase() + utmSource.slice(1);

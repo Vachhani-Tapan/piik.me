@@ -1017,10 +1017,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // Create upload promise with timeout
-                const uploadPromise = new Promise(async (resolve, reject) => {
-                    try {
-                        // Upload to Firebase Storage
-                        const storage = firebase.storage();
+                const uploadPromise = new Promise((resolve, reject) => {
+                    (async () => {
+                        try {
+                            // Upload to Firebase Storage
+                            const storage = firebase.storage();
                         console.log('Storage bucket:', storage.app.options.storageBucket);
                         
                         const storageRef = storage.ref();
@@ -1057,6 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (error) {
                         reject(error);
                     }
+                })();
                 });
 
                 // Set timeout for upload (60 seconds)
