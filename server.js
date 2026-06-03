@@ -15,6 +15,7 @@ const fetch = typeof globalThis.fetch === 'function'
 const redisUtils = require('./src/utils/redis.utils');
 const redirectCache = require('./src/utils/redirect-cache.utils');
 const { securityHeaders, apiLimiter, bugReportLimiter } = require('./src/middleware/security.middleware');
+const splitTestService = require('./src/services/splitTest.service');
 require('dotenv').config();
 
 // Initialize Firebase Admin
