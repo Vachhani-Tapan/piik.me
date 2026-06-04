@@ -12,6 +12,7 @@ const admin = require('firebase-admin');
 const fetch = typeof globalThis.fetch === 'function'
   ? globalThis.fetch
   : (...args) => import('node-fetch').then(({ default: fetchFn }) => fetchFn(...args));
+const checkLinkHealth = require('./src/utils/checkLinkHealth');
 const redisUtils = require('./src/utils/redis.utils');
 const redirectCache = require('./src/utils/redirect-cache.utils');
 const { securityHeaders, apiLimiter, bugReportLimiter } = require('./src/middleware/security.middleware');
@@ -391,7 +392,7 @@ app.post('/api/shorten', verifyToken, async (req, res) => {
       finalUrl = urlWithUTM;
     }
   }
-
+  const healthData = await checkLinkHealth(finalUrl);
   const baseUrl = getBaseUrl(req);
   const shortUrl = `${baseUrl}/${shortCode}`;
   
@@ -469,7 +470,7 @@ app.post('/api/shorten', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error saving to Firestore:', error);
     
-    // Fallback to in-memory storage
+    // Fallback to in-memory storagehealthStatus
     links.set(shortCode, linkData);
     analytics.set(shortCode, analyticsData);
     await redirectCache.set(shortCode, normalizeRedirectLink(linkData));
