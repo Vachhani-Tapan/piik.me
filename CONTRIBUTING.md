@@ -13,7 +13,7 @@ First off, thank you for considering contributing to Zaplink! It's people like y
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our [Code of Conduct](docs/CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
 ## Getting Started
 
@@ -26,24 +26,29 @@ This project and everyone participating in it is governed by our [Code of Conduc
 ### Setup
 
 1. **Fork and Clone**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/zaplink.git
    cd zaplink
    ```
 
 2. **Install Dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Configure Environment**
+
    ```bash
    cp .env.example .env
    # Edit .env with your Firebase credentials
    ```
+
    See [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md) for detailed Firebase setup instructions.
 
 4. **Start Development Server**
+
    ```bash
    npm run dev
    ```
@@ -138,6 +143,7 @@ The backend is organized into modules for better maintainability:
 ### Making Changes
 
 1. **Create a Branch**
+
    ```bash
    git checkout -b feature/amazing-feature
    ```
@@ -145,16 +151,18 @@ The backend is organized into modules for better maintainability:
 2. **Make Your Changes** - Follow coding standards below
 
 3. **Test Locally**
+
    ```bash
    npm run dev
    # Test your changes thoroughly
    ```
 
 4. **Commit Your Changes**
+
    ```bash
    git commit -m "feat: add amazing feature"
    ```
-   
+
    Use conventional commits: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`
 
 5. **Push and Create PR**
@@ -182,7 +190,7 @@ The backend is organized into modules for better maintainability:
 3. Include screenshots for UI changes
 4. Keep PRs focused on one feature/fix
 5. Be responsive to review comments
-4.  Wait for review and address any feedback.
+6. Wait for review and address any feedback.
 
 ## 📄 License
 
