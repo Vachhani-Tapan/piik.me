@@ -154,9 +154,10 @@ async function loadBioLinks() {
         console.log('Loaded', bioLinks.length, 'bio links');
 
         // Sort by creation date (most recent first)
+        // Handles both raw Firestore Timestamps (.toDate()) and already-parsed Date objects
         bioLinks.sort((a, b) => {
-            const dateA = a.createdAt?.toDate?.() || new Date(0);
-            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            const dateA = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt?.toDate?.()?.getTime() || 0);
+            const dateB = b.createdAt instanceof Date ? b.createdAt.getTime() : (b.createdAt?.toDate?.()?.getTime() || 0);
             return dateB - dateA;
         });
 

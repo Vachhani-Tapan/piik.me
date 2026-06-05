@@ -237,6 +237,13 @@ function navigateToPage(page, updateHistory = true) {
         page = 'home';
     }
     
+    // Stop analytics polling when leaving the analytics page
+    if (window.analyticsPollInterval) {
+        clearInterval(window.analyticsPollInterval);
+        window.analyticsPollInterval = null;
+        window.analyticsPollFilter = null;
+    }
+    
     currentPage = page;
     
     // Update browser URL without reloading
@@ -2415,6 +2422,18 @@ function startAnalyticsPolling(linkFilter) {
     window.analyticsPollFilter = linkFilter;
 }
 
+// Reset analytics UI to empty state (used in error/no-data paths)
+function updateAnalyticsUI(impressions, clicks, ctr, visitors, countries, devices, browsers, referrers) {
+    const setText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+    setText('analyticsImpressions', (impressions || 0).toLocaleString());
+    setText('analyticsClicks', (clicks || 0).toLocaleString());
+    setText('analyticsCTR', (ctr || 0).toFixed(1) + '%');
+    setText('analyticsVisitors', (visitors || 0).toLocaleString());
+}
+
 async function loadAnalyticsData(linkFilter) {
     try {
         // Check if user is authenticated
@@ -2479,6 +2498,7 @@ async function loadAnalyticsData(linkFilter) {
             const linkData = entry.linkData || {};
             const shortCode = entry.shortCode;
             const analytics = entry.analytics;
+            if (!analytics) continue; // Skip entries with no analytics data
                 
                 // Read split test if filtering by a single link
                 if (linkFilter !== 'all' && linkData.splitTest) {

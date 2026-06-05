@@ -890,12 +890,6 @@ const QRGenerator = {
                 return;
             }
             
-            links.sort((a, b) => {
-                const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
-                const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
-                return dateB - dateA;
-            });
-            
             const recentLinks = links.slice(0, 6);
 
             this.quickLinksGrid.innerHTML = '';

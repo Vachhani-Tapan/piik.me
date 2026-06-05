@@ -16,6 +16,7 @@ const checkLinkHealth = require('./src/utils/checkLinkHealth');
 const redisUtils = require('./src/utils/redis.utils');
 const redirectCache = require('./src/utils/redirect-cache.utils');
 const { securityHeaders, apiLimiter, bugReportLimiter } = require('./src/middleware/security.middleware');
+const splitTestService = require('./src/services/splitTest.service');
 require('dotenv').config();
 
 // Initialize Firebase Admin
@@ -497,6 +498,10 @@ app.post('/api/shorten', verifyToken, async (req, res) => {
 // Get aggregated analytics for all of the authenticated user's links
 app.get('/api/user/analytics', verifyToken, async (req, res) => {
   const userId = req.user.uid;
+
+  if (!db) {
+    return res.status(503).json({ error: 'Firestore not available' });
+  }
 
   try {
     const linksSnapshot = await db.collection(COLLECTIONS.LINKS)
@@ -1118,7 +1123,7 @@ app.put('/api/links/:shortCode/reactivate', verifyToken, async (req, res) => {
     });
 
     // Restore in Redis
-    await redisUtils.setLinkInRedis(shortCode, { ...linkData, isActive: true });
+    await redisUtils.storeLinkInRedis(shortCode, { ...linkData, isActive: true });
 
     res.json({ success: true, message: 'Link reactivated successfully' });
   } catch (error) {
@@ -1141,15 +1146,44 @@ app.delete('/api/links/inactive', verifyToken, async (req, res) => {
       return res.json({ success: true, message: 'No inactive links to delete', count: 0 });
     }
 
-    const batch = db.batch();
+    const BATCH_LIMIT = 400;
     let count = 0;
+    let currentBatch = db.batch();
+    let batchOps = 0;
 
-    inactiveLinksQuery.docs.forEach(doc => {
-      batch.delete(doc.ref);
+    for (const doc of inactiveLinksQuery.docs) {
+      const data = doc.data();
+      const shortCode = data.shortCode;
+      if (!shortCode) continue;
+
+      // Delete link document
+      currentBatch.delete(doc.ref);
+      batchOps++;
+
+      // Delete associated analytics document
+      const firestoreId = toFirestoreId(shortCode);
+      const analyticsRef = db.collection(COLLECTIONS.ANALYTICS).doc(firestoreId);
+      currentBatch.delete(analyticsRef);
+      batchOps++;
+
+      // Clear cache
+      await redisUtils.deleteLinkFromRedis(shortCode).catch(() => {});
+      await redirectCache.delete(shortCode).catch(() => {});
+
       count++;
-    });
 
-    await batch.commit();
+      // Firestore batch limit is 500 — commit + refresh at 400 to stay safe
+      if (batchOps >= BATCH_LIMIT) {
+        await currentBatch.commit();
+        currentBatch = db.batch();
+        batchOps = 0;
+      }
+    }
+
+    // Commit remaining batch
+    if (batchOps > 0) {
+      await currentBatch.commit();
+    }
 
     res.json({ success: true, message: `Successfully deleted ${count} inactive link${count > 1 ? 's' : ''}`, count });
   } catch (error) {
