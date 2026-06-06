@@ -318,7 +318,7 @@ function renderBioLinkItems() {
         const urlInput = document.createElement('input');
         urlInput.type = 'url';
         urlInput.className = 'form-input';
-        urlInput.placeholder = 'https://example.com';
+        urlInput.placeholder = 'Link URL';
         urlInput.value = item.url || '';
         urlInput.addEventListener('change', function() { updateBioLinkItem(index, 'url', this.value); });
         
