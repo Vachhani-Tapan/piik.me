@@ -520,6 +520,12 @@ function initializeEventListeners() {
     
     // Initialize custom styled selects
     initializeCustomSelects();
+    document.querySelectorAll('.date-range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const days = btn.dataset.days === 'all' ? 'all' : parseInt(btn.dataset.days);
+        filterClicksChart(days);
+    });
+});
 }
 
 // ================================
@@ -2566,6 +2572,7 @@ async function loadAnalyticsData(linkFilter) {
             const timeB = new Date(b.timestamp).getTime();
             return timeA - timeB;
         });
+        window._lastClicksOverTimeData = allClickHistory;
         
         // Calculate unique visitors from click history (approximate by counting unique referrer+device combinations)
         const visitorFingerprints = new Set();
@@ -2648,6 +2655,11 @@ async function loadAnalyticsData(linkFilter) {
         
         // Render charts and lists
         renderClicksChart(clicksOverTimeData);
+        const buttons = document.querySelectorAll('.date-range-btn');
+            buttons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.days === 'all');
+});
+
         renderReferrersChart(topReferrers);
         renderGeographicList(geographicList);
         renderDevicesList(devicesList);
@@ -2770,18 +2782,15 @@ function processClicksOverTime(clickHistory) {
 }
 
 function renderClicksChart(chartData) {
-    // Implement with Chart.js
     const ctx = document.getElementById('clicksChart');
     if (!ctx) return;
-    
-    // Destroy existing chart if any
+
     if (window.clicksChartInstance) {
         window.clicksChartInstance.destroy();
     }
-    
+
     const { labels, data, granularity } = chartData;
-    
-    // Create new chart
+
     window.clicksChartInstance = new Chart(ctx, {
         type: 'line',
         data: {
@@ -2798,16 +2807,8 @@ function renderClicksChart(chartData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            }
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
         }
     });
 }
@@ -3543,3 +3544,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+function filterClicksChart(days) {
+    const raw = window._lastClicksOverTimeData;
+    if (!raw || raw.length === 0) return;
+
+    let filtered = raw;
+    if (days !== 'all') {
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        filtered = raw.filter(click => 
+            new Date(click.timestamp).getTime() >= cutoff
+        );
+    }
+
+    document.querySelectorAll('.date-range-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.days === String(days));
+    });
+
+    renderClicksChart(processClicksOverTime(filtered));
+}
