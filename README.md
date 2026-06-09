@@ -10,6 +10,7 @@
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore-orange.svg)](https://firebase.google.com)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-Real--time-black.svg)](https://socket.io)
 [![Vercel](https://img.shields.io/badge/Deploy-Vercel-black.svg)](https://vercel.com)
+[![CI](https://github.com/xthxr/piik.me/actions/workflows/ci.yml/badge.svg)](https://github.com/xthxr/piik.me/actions/workflows/ci.yml)
 
 **A professional-grade, open-source platform for creating trackable short links, personalized bio pages, and real-time analytics with instant QR code generation — a better alternative to Bitly.**
 
